@@ -1,3 +1,7 @@
+---
+globs: *.json
+alwaysApply: false
+---
 # JSON File Editing with MCP Tools
 
 When editing JSON files (especially translation files like messages/*.json, i18n files, or any JSON configuration), ALWAYS use the JSON Editor MCP tools instead of directly editing the files:
