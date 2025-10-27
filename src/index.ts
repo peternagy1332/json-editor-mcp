@@ -157,6 +157,30 @@ class JsonEditorMCPServer {
 
   private async writeJsonValue(filePath: string, path: string, value: any): Promise<CallToolResult> {
     let jsonData = await this.readJsonFile(filePath);
+    
+    // If value is an object, recursively set each key-value pair
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      const results: string[] = [];
+      
+      for (const [key, val] of Object.entries(value)) {
+        const nestedPath = path ? `${path}.${key}` : key;
+        this.setValueAtPath(jsonData, nestedPath, val);
+        results.push(`${nestedPath}: ${JSON.stringify(val)}`);
+      }
+      
+      await this.writeJsonFile(filePath, jsonData);
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Successfully wrote object to ${path} in ${filePath}:\n${results.join('\n')}`,
+          },
+        ],
+      };
+    }
+    
+    // For primitive values, set directly
     this.setValueAtPath(jsonData, path, value);
     await this.writeJsonFile(filePath, jsonData);
     
