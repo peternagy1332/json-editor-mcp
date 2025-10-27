@@ -1,0 +1,275 @@
+#!/usr/bin/env node
+
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+  CallToolResult,
+} from '@modelcontextprotocol/sdk/types.js';
+import { promises as fs } from 'fs';
+
+class JsonEditorMCPServer {
+  private server: Server;
+
+  constructor() {
+    this.server = new Server(
+      {
+        name: 'json-editor-mcp',
+        version: '1.0.0',
+      },
+      {
+        capabilities: {
+          tools: {},
+        },
+      }
+    );
+
+    this.setupToolHandlers();
+  }
+
+  private setupToolHandlers(): void {
+    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+      return {
+        tools: [
+          {
+            name: 'read_json_value',
+            description: 'Read a value from a JSON file at a specified path using dot notation',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                filePath: {
+                  type: 'string',
+                  description: 'Path to the JSON file',
+                },
+                path: {
+                  type: 'string',
+                  description: 'Dot notation path to the value (e.g., "common.welcome")',
+                },
+              },
+              required: ['filePath', 'path'],
+            },
+          },
+          {
+            name: 'write_json_value',
+            description: 'Write a value to a JSON file at a specified path using dot notation. Creates missing paths automatically.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                filePath: {
+                  type: 'string',
+                  description: 'Path to the JSON file',
+                },
+                path: {
+                  type: 'string',
+                  description: 'Dot notation path to the value (e.g., "common.welcome")',
+                },
+                value: {
+                  description: 'Value to write (any JSON-serializable type)',
+                },
+              },
+              required: ['filePath', 'path', 'value'],
+            },
+          },
+          {
+            name: 'merge_duplicate_keys',
+            description: 'Deep merge duplicate keys in a JSON file. Last value wins for primitives, objects merge recursively.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                filePath: {
+                  type: 'string',
+                  description: 'Path to the JSON file',
+                },
+              },
+              required: ['filePath'],
+            },
+          },
+        ],
+      };
+    });
+
+    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      const { name, arguments: args } = request.params;
+
+      if (!args) {
+        throw new Error('No arguments provided');
+      }
+
+      try {
+        switch (name) {
+          case 'read_json_value':
+            return await this.readJsonValue(args.filePath as string, args.path as string);
+          case 'write_json_value':
+            return await this.writeJsonValue(args.filePath as string, args.path as string, args.value);
+          case 'merge_duplicate_keys':
+            return await this.mergeDuplicateKeys(args.filePath as string);
+          default:
+            throw new Error(`Unknown tool: ${name}`);
+        }
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+        };
+      }
+    });
+  }
+
+  private async readJsonValue(filePath: string, path: string): Promise<CallToolResult> {
+    const jsonData = await this.readJsonFile(filePath);
+    const value = this.getValueAtPath(jsonData, path);
+    
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(value, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async writeJsonValue(filePath: string, path: string, value: any): Promise<CallToolResult> {
+    let jsonData = await this.readJsonFile(filePath);
+    this.setValueAtPath(jsonData, path, value);
+    await this.writeJsonFile(filePath, jsonData);
+    
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Successfully wrote value to ${path} in ${filePath}`,
+        },
+      ],
+    };
+  }
+
+  private async mergeDuplicateKeys(filePath: string): Promise<CallToolResult> {
+    const jsonData = await this.readJsonFile(filePath);
+    const mergedData = this.deepMergeDuplicates(jsonData);
+    await this.writeJsonFile(filePath, mergedData);
+    
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Successfully merged duplicate keys in ${filePath}`,
+        },
+      ],
+    };
+  }
+
+  private async readJsonFile(filePath: string): Promise<any> {
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      return JSON.parse(content);
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+        return {};
+      }
+      throw new Error(`Failed to read JSON file: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async writeJsonFile(filePath: string, data: any): Promise<void> {
+    const content = JSON.stringify(data, null, 2);
+    await fs.writeFile(filePath, content, 'utf-8');
+  }
+
+  private getValueAtPath(obj: any, path: string): any {
+    const keys = path.split('.');
+    let current = obj;
+    
+    for (const key of keys) {
+      if (current === null || current === undefined || typeof current !== 'object') {
+        throw new Error(`Path ${path} not found: ${key} is not an object`);
+      }
+      current = current[key];
+    }
+    
+    return current;
+  }
+
+  private setValueAtPath(obj: any, path: string, value: any): void {
+    const keys = path.split('.');
+    let current = obj;
+    
+    for (let i = 0; i < keys.length - 1; i++) {
+      const key = keys[i];
+      if (!(key in current) || typeof current[key] !== 'object' || current[key] === null) {
+        current[key] = {};
+      }
+      current = current[key];
+    }
+    
+    current[keys[keys.length - 1]] = value;
+  }
+
+  private deepMergeDuplicates(obj: any): any {
+    if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
+      return obj;
+    }
+
+    const result: any = {};
+    const seenKeys = new Set<string>();
+
+    for (const [key, value] of Object.entries(obj)) {
+      if (seenKeys.has(key)) {
+        // Merge with existing value
+        const existingValue = result[key];
+        if (typeof existingValue === 'object' && typeof value === 'object' && 
+            existingValue !== null && value !== null && 
+            !Array.isArray(existingValue) && !Array.isArray(value)) {
+          result[key] = this.deepMerge(existingValue, value);
+        } else {
+          // Last value wins for primitives or incompatible types
+          result[key] = this.deepMergeDuplicates(value);
+        }
+      } else {
+        seenKeys.add(key);
+        result[key] = this.deepMergeDuplicates(value);
+      }
+    }
+
+    return result;
+  }
+
+  private deepMerge(target: any, source: any): any {
+    if (source === null || typeof source !== 'object' || Array.isArray(source)) {
+      return source;
+    }
+
+    if (target === null || typeof target !== 'object' || Array.isArray(target)) {
+      return source;
+    }
+
+    const result = { ...target };
+
+    for (const [key, value] of Object.entries(source)) {
+      if (key in result && typeof result[key] === 'object' && typeof value === 'object' && 
+          result[key] !== null && value !== null && 
+          !Array.isArray(result[key]) && !Array.isArray(value)) {
+        result[key] = this.deepMerge(result[key], value);
+      } else {
+        result[key] = this.deepMergeDuplicates(value);
+      }
+    }
+
+    return result;
+  }
+
+  async run(): Promise<void> {
+    const transport = new StdioServerTransport();
+    await this.server.connect(transport);
+    console.error('JSON Editor MCP server running on stdio');
+  }
+}
+
+// Start the server
+const server = new JsonEditorMCPServer();
+server.run().catch(console.error);

@@ -1,0 +1,28 @@
+{
+  "common": {
+    "welcome": "Bienvenido a nuestro sitio web",
+    "goodbye": "Hasta luego",
+    "loading": "Cargando..."
+  },
+  "navigation": {
+    "home": "Inicio",
+    "about": "Acerca de",
+    "contact": "Contacto"
+  },
+  "pages": {
+    "home": {
+      "title": "Bienvenido a Nuestra Plataforma",
+      "subtitle": "La mejor solución para tus necesidades"
+    },
+    "about": {
+      "title": "Acerca de Nosotros",
+      "description": "Somos un equipo de desarrolladores apasionados"
+    }
+  },
+  "forms": {
+    "email": "Dirección de correo",
+    "password": "Contraseña",
+    "submit": "Enviar",
+    "cancel": "Cancelar"
+  }
+}

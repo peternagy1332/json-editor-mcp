@@ -1,0 +1,28 @@
+{
+  "common": {
+    "welcome": "Welcome to our website",
+    "goodbye": "See you later",
+    "loading": "Loading..."
+  },
+  "navigation": {
+    "home": "Home",
+    "about": "About",
+    "contact": "Contact"
+  },
+  "pages": {
+    "home": {
+      "title": "Welcome to Our Platform",
+      "subtitle": "The best solution for your needs"
+    },
+    "about": {
+      "title": "About Us",
+      "description": "We are a team of passionate developers"
+    }
+  },
+  "forms": {
+    "email": "Email address",
+    "password": "Password",
+    "submit": "Submit",
+    "cancel": "Cancel"
+  }
+}

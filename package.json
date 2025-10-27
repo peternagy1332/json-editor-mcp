@@ -1,0 +1,51 @@
+{
+  "name": "json-editor-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for editing JSON files with read, write, and deep merge capabilities",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "json-editor-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "json",
+    "editor",
+    "i18n",
+    "internationalization",
+    "nextjs",
+    "model-context-protocol"
+  ],
+  "author": "JSON Editor MCP Contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/peternagy1332/json-editor-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/peternagy1332/json-editor-mcp/issues"
+  },
+  "homepage": "https://github.com/peternagy1332/json-editor-mcp#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "examples"
+  ]
+}
