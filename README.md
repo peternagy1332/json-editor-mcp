@@ -37,6 +37,85 @@ Add to your MCP client configuration:
 }
 ```
 
+### Cursor Rules Integration
+
+For the best experience with Cursor, copy the rule file to your project:
+
+```bash
+# Copy the rule file to your project
+cp .cursor/rules/json-editor-mcp.mdc /path/to/your/project/.cursor/rules/
+```
+
+Or manually create `.cursor/rules/json-editor-mcp.mdc` in your project with this content:
+
+```markdown
+# JSON File Editing with MCP Tools
+
+When editing JSON files (especially translation files like messages/*.json, i18n files, or any JSON configuration), ALWAYS use the JSON Editor MCP tools instead of directly editing the files:
+
+## Available Tools:
+- `read_json_value` - Read values from JSON files using dot notation paths
+- `write_json_value` - Write values to JSON files with automatic path creation
+- `merge_duplicate_keys` - Deep merge duplicate keys in JSON files
+
+## Usage Guidelines:
+
+### For Reading JSON Values:
+- Use `read_json_value` to read specific values from JSON files
+- Example: `read_json_value("messages/en.json", "common.welcome")`
+- Always specify the full file path and dot notation path
+
+### For Writing JSON Values:
+- Use `write_json_value` to add or update values in JSON files
+- Example: `write_json_value("messages/en.json", "common.greeting", "Hello World")`
+- The tool automatically creates missing paths
+- Supports nested objects: `write_json_value("config.json", "database.host", "localhost")`
+
+### For Merging Duplicate Keys:
+- Use `merge_duplicate_keys` when JSON files have duplicate keys
+- Example: `merge_duplicate_keys("messages/en.json")`
+- This performs deep merge with last value wins for primitives
+
+## When to Use These Tools:
+- ✅ Editing translation files (messages/*.json)
+- ✅ Updating configuration files
+- ✅ Managing i18n/locale files
+- ✅ Any JSON file manipulation
+- ❌ Don't use for non-JSON files
+- ❌ Don't manually edit JSON files when these tools are available
+
+## Examples for Common Scenarios:
+
+### Adding a new translation:
+```javascript
+write_json_value("messages/en.json", "pages.about.title", "About Us")
+```
+
+### Reading existing translation:
+```javascript
+read_json_value("messages/es.json", "common.welcome")
+```
+
+### Updating nested configuration:
+```javascript
+write_json_value("config.json", "api.endpoints.users", "/api/v1/users")
+```
+
+### Merging duplicate keys after manual editing:
+```javascript
+merge_duplicate_keys("messages/en.json")
+```
+
+## Important Notes:
+- Always use absolute or relative paths from the project root
+- Dot notation paths work for nested objects (e.g., "a.b.c")
+- The tools preserve JSON formatting and structure
+- Missing paths are created automatically when writing
+- Deep merge preserves object structure while merging duplicates
+
+This ensures consistent, reliable JSON file editing across the project.
+```
+
 ### Available Tools
 
 #### 1. `read_json_value`
