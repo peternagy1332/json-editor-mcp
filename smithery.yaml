@@ -87,8 +87,7 @@ devDependencies:
   - "typescript": "^5.0.0"
 
 # Runtime requirements
-runtime:
-  node: ">=18.0.0"
+runtime: typescript
 
 # Files to include in the package
 files:
