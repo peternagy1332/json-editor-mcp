@@ -1,0 +1,105 @@
+name: json-editor-mcp
+description: MCP server for editing JSON files with read, write, and deep merge capabilities. Perfect for managing multilingual Next.js projects and other JSON-based configurations.
+version: 1.0.0
+author: JSON Editor MCP Contributors
+license: MIT
+repository: https://github.com/peternagy1332/json-editor-mcp
+homepage: https://github.com/peternagy1332/json-editor-mcp#readme
+
+# MCP Server Configuration
+mcp:
+  server:
+    command: npx
+    args: ["json-editor-mcp"]
+    transport: stdio
+
+# Build Configuration
+build:
+  type: npm
+  command: npm run build
+  output: dist/
+
+# Package Information
+package:
+  type: npm
+  registry: https://registry.npmjs.org/
+  publish: true
+
+# Keywords for discovery
+keywords:
+  - mcp
+  - json
+  - editor
+  - i18n
+  - internationalization
+  - nextjs
+  - model-context-protocol
+  - translation
+  - localization
+
+# Tools provided by this MCP server
+tools:
+  - name: read_json_value
+    description: Read a value from a JSON file at a specified path using dot notation
+    inputSchema:
+      type: object
+      properties:
+        filePath:
+          type: string
+          description: Path to the JSON file
+        path:
+          type: string
+          description: Dot notation path to the value (e.g., "common.welcome")
+      required: [filePath, path]
+  
+  - name: write_json_value
+    description: Write a value to a JSON file at a specified path using dot notation. Creates missing paths automatically.
+    inputSchema:
+      type: object
+      properties:
+        filePath:
+          type: string
+          description: Path to the JSON file
+        path:
+          type: string
+          description: Dot notation path to the value (e.g., "common.welcome")
+        value:
+          description: Value to write (any JSON-serializable type)
+      required: [filePath, path, value]
+  
+  - name: merge_duplicate_keys
+    description: Deep merge duplicate keys in a JSON file. Last value wins for primitives, objects merge recursively.
+    inputSchema:
+      type: object
+      properties:
+        filePath:
+          type: string
+          description: Path to the JSON file
+      required: [filePath]
+
+# Dependencies
+dependencies:
+  - "@modelcontextprotocol/sdk": "^0.5.0"
+
+# Development dependencies
+devDependencies:
+  - "@types/node": "^20.0.0"
+  - "typescript": "^5.0.0"
+
+# Runtime requirements
+runtime:
+  node: ">=18.0.0"
+
+# Files to include in the package
+files:
+  - dist/
+  - README.md
+  - LICENSE
+  - examples/
+
+# Example usage
+examples:
+  - name: Next.js i18n
+    description: Managing translation files for multilingual Next.js projects
+    path: examples/nextjs-i18n/
+    readme: examples/nextjs-i18n/README.md
