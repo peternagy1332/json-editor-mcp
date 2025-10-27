@@ -57,6 +57,7 @@ When editing JSON files (especially translation files like messages/*.json, i18n
 - `read_json_value` - Read values from JSON files using dot notation paths
 - `write_json_value` - Write values to JSON files with automatic path creation
 - `merge_duplicate_keys` - Deep merge duplicate keys in JSON files
+- `read_multiple_json_values` - Read values from multiple JSON files at a specified path, returns a map
 
 ## Usage Guidelines:
 
@@ -75,6 +76,12 @@ When editing JSON files (especially translation files like messages/*.json, i18n
 - Use `merge_duplicate_keys` when JSON files have duplicate keys
 - Example: `merge_duplicate_keys("messages/en.json")`
 - This performs deep merge with last value wins for primitives
+
+### For Reading Multiple Files:
+- Use `read_multiple_json_values` to read the same path from multiple JSON files
+- Example: `read_multiple_json_values(["en.json", "es.json"], "common.welcome")`
+- Returns a map with file paths as keys and extracted values as values
+- Handles errors gracefully - if one file fails, others are still processed
 
 ## When to Use These Tools:
 - ✅ Editing translation files (messages/*.json)
@@ -155,6 +162,27 @@ Deep merge duplicate keys in a JSON file. Last value wins for primitives, object
 ```javascript
 // Merge duplicate keys in messages/en.json
 merge_duplicate_keys("messages/en.json")
+```
+
+#### 4. `read_multiple_json_values`
+Read values from multiple JSON files at a specified path using dot notation. Returns a map of file paths to values.
+
+**Parameters:**
+- `filePaths` (array): Array of paths to JSON files
+- `path` (string): Dot notation path (e.g., "common.welcome")
+
+**Example:**
+```javascript
+// Read "common.welcome" from multiple language files
+read_multiple_json_values(
+  ["messages/en.json", "messages/es.json", "messages/fr.json"], 
+  "common.welcome"
+)
+// Returns: {
+//   "messages/en.json": "Welcome to our website",
+//   "messages/es.json": "Bienvenido a nuestro sitio web", 
+//   "messages/fr.json": "Bienvenue sur notre site web"
+// }
 ```
 
 ## Next.js i18n Example

@@ -85,6 +85,25 @@ class JsonEditorMCPServer {
               required: ['filePath'],
             },
           },
+          {
+            name: 'read_multiple_json_values',
+            description: 'Read values from multiple JSON files at a specified path using dot notation. Returns a map of file paths to values.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                filePaths: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Array of paths to JSON files',
+                },
+                path: {
+                  type: 'string',
+                  description: 'Dot notation path to the value (e.g., "common.welcome")',
+                },
+              },
+              required: ['filePaths', 'path'],
+            },
+          },
         ],
       };
     });
@@ -104,6 +123,8 @@ class JsonEditorMCPServer {
             return await this.writeJsonValue(args.filePath as string, args.path as string, args.value);
           case 'merge_duplicate_keys':
             return await this.mergeDuplicateKeys(args.filePath as string);
+          case 'read_multiple_json_values':
+            return await this.readMultipleJsonValues(args.filePaths as string[], args.path as string);
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
@@ -164,6 +185,29 @@ class JsonEditorMCPServer {
     };
   }
 
+  private async readMultipleJsonValues(filePaths: string[], path: string): Promise<CallToolResult> {
+    const results: Record<string, any> = {};
+    
+    for (const filePath of filePaths) {
+      try {
+        const jsonData = await this.readJsonFile(filePath);
+        const value = this.getValueAtPath(jsonData, path);
+        results[filePath] = value;
+      } catch (error) {
+        results[filePath] = `Error: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    }
+    
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(results, null, 2),
+        },
+      ],
+    };
+  }
+
   private async readJsonFile(filePath: string): Promise<any> {
     try {
       const content = await fs.readFile(filePath, 'utf-8');
@@ -188,6 +232,9 @@ class JsonEditorMCPServer {
     for (const key of keys) {
       if (current === null || current === undefined || typeof current !== 'object') {
         throw new Error(`Path ${path} not found: ${key} is not an object`);
+      }
+      if (!(key in current)) {
+        throw new Error(`Path ${path} not found: ${key} does not exist`);
       }
       current = current[key];
     }
