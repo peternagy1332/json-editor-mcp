@@ -327,7 +327,7 @@ class JsonEditorMCPServer {
           !Array.isArray(result[key]) && !Array.isArray(value)) {
         result[key] = this.deepMerge(result[key], value);
       } else {
-        result[key] = this.deepMergeDuplicates(value);
+        result[key] = value;
       }
     }
 
