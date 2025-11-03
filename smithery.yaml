@@ -15,8 +15,8 @@ mcp:
 
 # Build Configuration
 build:
-  type: npm
-  command: npm run build
+  type: bun
+  command: bun run build
   output: dist/
 
 # Package Information
