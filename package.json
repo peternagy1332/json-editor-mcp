@@ -1,7 +1,8 @@
 {
   "name": "json-editor-mcp",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "MCP server for editing JSON files with read, write, and deep merge capabilities",
+  "type": "module",
   "main": "dist/index.js",
   "module": "src/index.ts",
   "types": "dist/index.d.ts",
