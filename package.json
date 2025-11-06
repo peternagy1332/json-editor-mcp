@@ -1,6 +1,6 @@
 {
   "name": "json-editor-mcp",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "MCP server for editing JSON files with read, write, and deep merge capabilities",
   "type": "module",
   "main": "dist/index.js",
@@ -13,7 +13,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
-    "test": "jest",
+    "test": "jest --maxWorkers=1",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "prepublishOnly": "npm run build"

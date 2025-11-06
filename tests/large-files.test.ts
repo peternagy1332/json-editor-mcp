@@ -8,8 +8,9 @@ describe('Large File Handling', () => {
   let server: JsonEditorMCPServerTestable;
   const testDir = path.join(__dirname, 'temp');
 
-  beforeEach(() => {
+  beforeEach(async () => {
     server = new JsonEditorMCPServerTestable();
+    await fs.mkdir(testDir, { recursive: true });
   });
 
   describe('Large JSON Objects', () => {

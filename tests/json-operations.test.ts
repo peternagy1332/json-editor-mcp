@@ -174,7 +174,7 @@ describe('JSON Operations', () => {
 
     it('should throw error when trying to delete from non-object', () => {
       const obj: any = { "key": "value" };
-      expect(() => server.deleteValueAtPath(obj, "key.nested")).toThrow("Path key.nested not found: nested is not an object");
+      expect(() => server.deleteValueAtPath(obj, "key.nested")).toThrow("Path key.nested not found: cannot delete from non-object");
     });
 
     it('should handle deleting last key in nested object', () => {

@@ -92,6 +92,28 @@ describe('MCP Integration Tests', () => {
       expect(fileContent).toEqual({ "object": objectValue });
     });
 
+    it('should write deeply nested objects correctly', async () => {
+      const filePath = path.join(testDir, 'write-deeply-nested.json');
+      const nestedValue = {
+        "level1": {
+          "level2": {
+            "level3": {
+              "key": "value",
+              "other": "data"
+            }
+          }
+        }
+      };
+      
+      const result = await server.writeMultipleJsonValues([filePath], "data", nestedValue);
+      expect(result[filePath]).toBe("Successfully wrote");
+      
+      const fileContent = await readTestFile(filePath);
+      expect(fileContent).toEqual({ "data": nestedValue });
+      expect(fileContent.data.level1.level2.level3.key).toBe("value");
+      expect(fileContent.data.level1.level2.level3.other).toBe("data");
+    });
+
     it('should update existing values in JSON files', async () => {
       const initialData = { "key": "oldValue" };
       const filePath = await createTestFile('update.json', initialData);
@@ -216,6 +238,102 @@ describe('MCP Integration Tests', () => {
       const fileContent2 = await readTestFile(filePath2);
       expect(fileContent1).toEqual({ "key": "value" });
       expect(fileContent2).toEqual({ "key": "value" });
+    });
+
+    it('should parse Python dict syntax', async () => {
+      const filePath = path.join(testDir, 'python-dict.json');
+      
+      const result = await server.writeMultipleJsonValues([filePath], "metadata", "{'title': 'Your Friends', 'description': 'A list of your friends'}");
+      expect(result[filePath]).toBe("Successfully wrote");
+      
+      const fileContent = await readTestFile(filePath);
+      expect(fileContent).toEqual({
+        "metadata": {
+          "title": "Your Friends",
+          "description": "A list of your friends"
+        }
+      });
+    });
+
+    it('should parse Python dict with boolean and null values', async () => {
+      const filePath = path.join(testDir, 'python-dict-boolean.json');
+      
+      const result = await server.writeMultipleJsonValues([filePath], "config", "{'enabled': True, 'debug': False, 'value': None}");
+      expect(result[filePath]).toBe("Successfully wrote");
+      
+      const fileContent = await readTestFile(filePath);
+      expect(fileContent).toEqual({
+        "config": {
+          "enabled": true,
+          "debug": false,
+          "value": null
+        }
+      });
+    });
+
+    it('should handle Python dict with nested structures', async () => {
+      const filePath = path.join(testDir, 'python-dict-nested.json');
+      
+      const result = await server.writeMultipleJsonValues([filePath], "data", "{'user': {'name': 'John', 'age': 30}, 'active': True}");
+      expect(result[filePath]).toBe("Successfully wrote");
+      
+      const fileContent = await readTestFile(filePath);
+      expect(fileContent).toEqual({
+        "data": {
+          "user": {
+            "name": "John",
+            "age": 30
+          },
+          "active": true
+        }
+      });
+    });
+
+    it('should handle deeply nested Python dict structures', async () => {
+      const filePath = path.join(testDir, 'python-dict-deeply-nested.json');
+      
+      const result = await server.writeMultipleJsonValues([filePath], "metadata", "{'level1': {'level2': {'level3': {'key': 'value', 'other': 'data'}}}}");
+      expect(result[filePath]).toBe("Successfully wrote");
+      
+      const fileContent = await readTestFile(filePath);
+      expect(fileContent).toEqual({
+        "metadata": {
+          "level1": {
+            "level2": {
+              "level3": {
+                "key": "value",
+                "other": "data"
+              }
+            }
+          }
+        }
+      });
+      expect(fileContent.metadata.level1.level2.level3.key).toBe("value");
+      expect(fileContent.metadata.level1.level2.level3.other).toBe("data");
+    });
+
+    it('should preserve nested object structure when writing directly', async () => {
+      const filePath = path.join(testDir, 'nested-object-direct.json');
+      const nestedObject = {
+        "title": "Your Friends",
+        "description": "A list of your friends",
+        "metadata": {
+          "created": "2024-01-01",
+          "author": {
+            "name": "John",
+            "email": "john@example.com"
+          }
+        }
+      };
+      
+      const result = await server.writeMultipleJsonValues([filePath], "page", nestedObject);
+      expect(result[filePath]).toBe("Successfully wrote");
+      
+      const fileContent = await readTestFile(filePath);
+      expect(fileContent).toEqual({
+        "page": nestedObject
+      });
+      expect(fileContent.page.metadata.author.name).toBe("John");
     });
   });
 

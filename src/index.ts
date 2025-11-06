@@ -8,6 +8,7 @@ import {
   CallToolResult,
 } from '@modelcontextprotocol/sdk/types.js';
 import { promises as fs } from 'fs';
+import path from 'path';
 
 class JsonEditorMCPServer {
   private server: Server;
@@ -143,6 +144,26 @@ class JsonEditorMCPServer {
     });
   }
 
+  private parsePythonDict(value: string): any {
+    try {
+      let jsonString = value.trim();
+      
+      if (!jsonString.startsWith('{') || !jsonString.endsWith('}')) {
+        throw new Error('Not a Python dict');
+      }
+      
+      jsonString = jsonString
+        .replace(/'/g, '"')
+        .replace(/True/g, 'true')
+        .replace(/False/g, 'false')
+        .replace(/None/g, 'null');
+      
+      return JSON.parse(jsonString);
+    } catch {
+      throw new Error('Failed to parse Python dict');
+    }
+  }
+
   private async writeMultipleJsonValues(filePaths: string[], path: string, value: any): Promise<CallToolResult> {
     const results: Record<string, string> = {};
     
@@ -157,7 +178,11 @@ class JsonEditorMCPServer {
           processedValue = parsed;
         }
       } catch {
-        processedValue = value;
+        try {
+          processedValue = this.parsePythonDict(value);
+        } catch {
+          processedValue = value;
+        }
       }
     }
     
@@ -273,6 +298,7 @@ class JsonEditorMCPServer {
 
   private async writeJsonFile(filePath: string, data: any): Promise<void> {
     const content = JSON.stringify(data, null, 2);
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, content, 'utf-8');
   }
 

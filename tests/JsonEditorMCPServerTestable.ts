@@ -174,6 +174,26 @@ export class JsonEditorMCPServerTestable {
     return results;
   }
 
+  private parsePythonDict(value: string): any {
+    try {
+      let jsonString = value.trim();
+      
+      if (!jsonString.startsWith('{') || !jsonString.endsWith('}')) {
+        throw new Error('Not a Python dict');
+      }
+      
+      jsonString = jsonString
+        .replace(/'/g, '"')
+        .replace(/True/g, 'true')
+        .replace(/False/g, 'false')
+        .replace(/None/g, 'null');
+      
+      return JSON.parse(jsonString);
+    } catch {
+      throw new Error('Failed to parse Python dict');
+    }
+  }
+
   public async writeMultipleJsonValues(filePaths: string[], path: string, value: any): Promise<Record<string, string>> {
     const results: Record<string, string> = {};
     
@@ -188,7 +208,11 @@ export class JsonEditorMCPServerTestable {
           processedValue = parsed;
         }
       } catch {
-        processedValue = value;
+        try {
+          processedValue = this.parsePythonDict(value);
+        } catch {
+          processedValue = value;
+        }
       }
     }
     
