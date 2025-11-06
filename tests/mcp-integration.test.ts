@@ -21,10 +21,34 @@ class MockJsonEditorMCPServer extends JsonEditorMCPServerTestable {
       jsonData = {};
     }
     
+    // If value is a string, try to parse it as JSON first
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        // If parsing succeeds and result is an object (not array, not null, not primitive), treat it as object
+        if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          value = parsed;
+        } else {
+          // Parsed to a primitive or array, use the parsed value
+          value = parsed;
+        }
+      } catch {
+        // Not valid JSON, treat as string primitive
+        // value remains as the original string
+      }
+    }
+    
     if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-      for (const [key, val] of Object.entries(value)) {
-        const nestedPath = path ? `${path}.${key}` : key;
-        this.setValueAtPath(jsonData, nestedPath, val);
+      const entries = Object.entries(value);
+      
+      // If object is empty, set it directly at the path
+      if (entries.length === 0) {
+        this.setValueAtPath(jsonData, path, value);
+      } else {
+        for (const [key, val] of entries) {
+          const nestedPath = path ? `${path}.${key}` : key;
+          this.setValueAtPath(jsonData, nestedPath, val);
+        }
       }
     } else {
       this.setValueAtPath(jsonData, path, value);
@@ -131,6 +155,91 @@ describe('MCP Integration Tests', () => {
       
       const result = await readTestFile(filePath);
       expect(result).toEqual({ "a": { "b": { "c": { "d": "value" } } } });
+    });
+
+    it('should parse JSON string and insert as nested object', async () => {
+      const filePath = path.join(testDir, 'json-string-object.json');
+      
+      await server.writeJsonValue(filePath, "test", '{"key": "value", "nested": {"foo": "bar"}}');
+      
+      const result = await readTestFile(filePath);
+      expect(result).toEqual({
+        "test": {
+          "key": "value",
+          "nested": {
+            "foo": "bar"
+          }
+        }
+      });
+    });
+
+    it('should parse JSON string and recursively create nested paths', async () => {
+      const filePath = path.join(testDir, 'json-string-nested.json');
+      
+      await server.writeJsonValue(filePath, "level1.level2", '{"key1": "value1", "key2": "value2"}');
+      
+      const result = await readTestFile(filePath);
+      expect(result).toEqual({
+        "level1": {
+          "level2": {
+            "key1": "value1",
+            "key2": "value2"
+          }
+        }
+      });
+    });
+
+    it('should treat invalid JSON string as string primitive', async () => {
+      const filePath = path.join(testDir, 'invalid-json-string.json');
+      
+      await server.writeJsonValue(filePath, "key", "not valid json {");
+      
+      const result = await readTestFile(filePath);
+      expect(result).toEqual({ "key": "not valid json {" });
+    });
+
+    it('should parse JSON string with primitive value', async () => {
+      const filePath = path.join(testDir, 'json-string-primitive.json');
+      
+      await server.writeJsonValue(filePath, "number", "123");
+      await server.writeJsonValue(filePath, "boolean", "true");
+      await server.writeJsonValue(filePath, "nullValue", "null");
+      
+      const result = await readTestFile(filePath);
+      expect(result).toEqual({
+        "number": 123,
+        "boolean": true,
+        "nullValue": null
+      });
+    });
+
+    it('should parse JSON string with array', async () => {
+      const filePath = path.join(testDir, 'json-string-array.json');
+      
+      await server.writeJsonValue(filePath, "items", '[1, 2, 3, "four"]');
+      
+      const result = await readTestFile(filePath);
+      expect(result).toEqual({
+        "items": [1, 2, 3, "four"]
+      });
+    });
+
+    it('should handle regular string primitive (not JSON)', async () => {
+      const filePath = path.join(testDir, 'regular-string.json');
+      
+      await server.writeJsonValue(filePath, "message", "Hello, world!");
+      
+      const result = await readTestFile(filePath);
+      expect(result).toEqual({ "message": "Hello, world!" });
+    });
+
+    it('should handle empty JSON object string', async () => {
+      const filePath = path.join(testDir, 'empty-json-object.json');
+      
+      await server.writeJsonValue(filePath, "empty", "{}");
+      
+      const result = await readTestFile(filePath);
+      expect(result).toEqual({ "empty": {} });
     });
   });
 

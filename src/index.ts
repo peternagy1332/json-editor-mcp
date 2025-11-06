@@ -158,11 +158,45 @@ class JsonEditorMCPServer {
   private async writeJsonValue(filePath: string, path: string, value: any): Promise<CallToolResult> {
     let jsonData = await this.readJsonFile(filePath);
     
+    // If value is a string, try to parse it as JSON first
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        // If parsing succeeds and result is an object (not array, not null, not primitive), treat it as object
+        if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          value = parsed;
+        } else {
+          // Parsed to a primitive or array, use the parsed value
+          value = parsed;
+        }
+      } catch {
+        // Not valid JSON, treat as string primitive
+        // value remains as the original string
+      }
+    }
+    
     // If value is an object, recursively set each key-value pair
     if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      const entries = Object.entries(value);
+      
+      // If object is empty, set it directly at the path
+      if (entries.length === 0) {
+        this.setValueAtPath(jsonData, path, value);
+        await this.writeJsonFile(filePath, jsonData);
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Successfully wrote empty object to ${path} in ${filePath}`,
+            },
+          ],
+        };
+      }
+      
       const results: string[] = [];
       
-      for (const [key, val] of Object.entries(value)) {
+      for (const [key, val] of entries) {
         const nestedPath = path ? `${path}.${key}` : key;
         this.setValueAtPath(jsonData, nestedPath, val);
         results.push(`${nestedPath}: ${JSON.stringify(val)}`);
