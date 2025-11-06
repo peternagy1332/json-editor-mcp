@@ -29,6 +29,12 @@ class JsonEditorMCPServer {
     this.setupToolHandlers();
   }
 
+  private validateAbsolutePath(filePath: string): void {
+    if (!path.isAbsolute(filePath)) {
+      throw new Error(`Path must be absolute: ${filePath}`);
+    }
+  }
+
   private setupToolHandlers(): void {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       return {
@@ -165,6 +171,10 @@ class JsonEditorMCPServer {
   }
 
   private async writeMultipleJsonValues(filePaths: string[], path: string, value: any): Promise<CallToolResult> {
+    for (const filePath of filePaths) {
+      this.validateAbsolutePath(filePath);
+    }
+    
     const results: Record<string, string> = {};
     
     let processedValue = value;
@@ -223,6 +233,7 @@ class JsonEditorMCPServer {
   }
 
   private async mergeDuplicateKeys(filePath: string): Promise<CallToolResult> {
+    this.validateAbsolutePath(filePath);
     const jsonData = await this.readJsonFile(filePath);
     const mergedData = this.deepMergeDuplicates(jsonData);
     await this.writeJsonFile(filePath, mergedData);
@@ -238,6 +249,10 @@ class JsonEditorMCPServer {
   }
 
   private async readMultipleJsonValues(filePaths: string[], path: string): Promise<CallToolResult> {
+    for (const filePath of filePaths) {
+      this.validateAbsolutePath(filePath);
+    }
+    
     const results: Record<string, any> = {};
     
     for (const filePath of filePaths) {
@@ -261,6 +276,10 @@ class JsonEditorMCPServer {
   }
 
   private async deleteMultipleJsonValues(filePaths: string[], path: string): Promise<CallToolResult> {
+    for (const filePath of filePaths) {
+      this.validateAbsolutePath(filePath);
+    }
+    
     const results: Record<string, string> = {};
     
     for (const filePath of filePaths) {

@@ -4,6 +4,11 @@ import path from 'path';
 // Testable version of JsonEditorMCPServer that exposes private methods
 // This version doesn't import the MCP SDK to avoid ESM issues in Jest
 export class JsonEditorMCPServerTestable {
+  public validateAbsolutePath(filePath: string): void {
+    if (!path.isAbsolute(filePath)) {
+      throw new Error(`Path must be absolute: ${filePath}`);
+    }
+  }
   // Expose private methods for testing
   public deepMergeDuplicates(obj: any, visited = new WeakSet()): any {
     if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
@@ -147,6 +152,7 @@ export class JsonEditorMCPServerTestable {
   }
 
   public async mergeDuplicateKeys(filePath: string): Promise<void> {
+    this.validateAbsolutePath(filePath);
     const jsonData = await this.readJsonFile(filePath);
     const mergedData = this.deepMergeDuplicates(jsonData);
     await this.writeJsonFile(filePath, mergedData);
@@ -159,6 +165,10 @@ export class JsonEditorMCPServerTestable {
   }
 
   public async readMultipleJsonValues(filePaths: string[], path: string): Promise<Record<string, any>> {
+    for (const filePath of filePaths) {
+      this.validateAbsolutePath(filePath);
+    }
+    
     const results: Record<string, any> = {};
     
     for (const filePath of filePaths) {
@@ -195,6 +205,10 @@ export class JsonEditorMCPServerTestable {
   }
 
   public async writeMultipleJsonValues(filePaths: string[], path: string, value: any): Promise<Record<string, string>> {
+    for (const filePath of filePaths) {
+      this.validateAbsolutePath(filePath);
+    }
+    
     const results: Record<string, string> = {};
     
     let processedValue = value;
@@ -246,6 +260,10 @@ export class JsonEditorMCPServerTestable {
   }
 
   public async deleteMultipleJsonValues(filePaths: string[], path: string): Promise<Record<string, string>> {
+    for (const filePath of filePaths) {
+      this.validateAbsolutePath(filePath);
+    }
+    
     const results: Record<string, string> = {};
     
     for (const filePath of filePaths) {

@@ -55,8 +55,9 @@ describe('MCP Integration Tests', () => {
     });
 
     it('should handle non-existent file', async () => {
-      const result = await server.readMultipleJsonValues(['nonexistent.json'], "key");
-      expect(result['nonexistent.json']).toContain("Error");
+      const nonexistentPath = path.join(testDir, 'nonexistent.json');
+      const result = await server.readMultipleJsonValues([nonexistentPath], "key");
+      expect(result[nonexistentPath]).toContain("Error");
     });
   });
 
