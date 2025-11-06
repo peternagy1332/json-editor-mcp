@@ -33,45 +33,6 @@ class JsonEditorMCPServer {
       return {
         tools: [
           {
-            name: 'read_json_value',
-            description: 'Read a value from a JSON file at a specified path using dot notation',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                filePath: {
-                  type: 'string',
-                  description: 'Path to the JSON file',
-                },
-                path: {
-                  type: 'string',
-                  description: 'Dot notation path to the value (e.g., "common.welcome")',
-                },
-              },
-              required: ['filePath', 'path'],
-            },
-          },
-          {
-            name: 'write_json_value',
-            description: 'Write a value to a JSON file at a specified path using dot notation. Creates missing paths automatically.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                filePath: {
-                  type: 'string',
-                  description: 'Path to the JSON file',
-                },
-                path: {
-                  type: 'string',
-                  description: 'Dot notation path to the value (e.g., "common.welcome")',
-                },
-                value: {
-                  description: 'Value to write (any JSON-serializable type)',
-                },
-              },
-              required: ['filePath', 'path', 'value'],
-            },
-          },
-          {
             name: 'merge_duplicate_keys',
             description: 'Deep merge duplicate keys in a JSON file. Last value wins for primitives, objects merge recursively.',
             inputSchema: {
@@ -104,6 +65,47 @@ class JsonEditorMCPServer {
               required: ['filePaths', 'path'],
             },
           },
+          {
+            name: 'write_multiple_json_values',
+            description: 'Write a value to multiple JSON files at a specified path using dot notation. Creates missing paths automatically. Returns a map of file paths to write results.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                filePaths: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Array of paths to JSON files',
+                },
+                path: {
+                  type: 'string',
+                  description: 'Dot notation path to the value (e.g., "common.welcome")',
+                },
+                value: {
+                  description: 'Value to write (any JSON-serializable type)',
+                },
+              },
+              required: ['filePaths', 'path', 'value'],
+            },
+          },
+          {
+            name: 'delete_multiple_json_values',
+            description: 'Delete a value at a specified path from multiple JSON files using dot notation. Returns a map of file paths to deletion results.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                filePaths: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Array of paths to JSON files',
+                },
+                path: {
+                  type: 'string',
+                  description: 'Dot notation path to the value to delete (e.g., "common.welcome")',
+                },
+              },
+              required: ['filePaths', 'path'],
+            },
+          },
         ],
       };
     });
@@ -117,14 +119,14 @@ class JsonEditorMCPServer {
 
       try {
         switch (name) {
-          case 'read_json_value':
-            return await this.readJsonValue(args.filePath as string, args.path as string);
-          case 'write_json_value':
-            return await this.writeJsonValue(args.filePath as string, args.path as string, args.value);
           case 'merge_duplicate_keys':
             return await this.mergeDuplicateKeys(args.filePath as string);
           case 'read_multiple_json_values':
             return await this.readMultipleJsonValues(args.filePaths as string[], args.path as string);
+          case 'write_multiple_json_values':
+            return await this.writeMultipleJsonValues(args.filePaths as string[], args.path as string, args.value);
+          case 'delete_multiple_json_values':
+            return await this.deleteMultipleJsonValues(args.filePaths as string[], args.path as string);
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
@@ -141,88 +143,55 @@ class JsonEditorMCPServer {
     });
   }
 
-  private async readJsonValue(filePath: string, path: string): Promise<CallToolResult> {
-    const jsonData = await this.readJsonFile(filePath);
-    const value = this.getValueAtPath(jsonData, path);
+  private async writeMultipleJsonValues(filePaths: string[], path: string, value: any): Promise<CallToolResult> {
+    const results: Record<string, string> = {};
     
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(value, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async writeJsonValue(filePath: string, path: string, value: any): Promise<CallToolResult> {
-    let jsonData = await this.readJsonFile(filePath);
+    let processedValue = value;
     
-    // If value is a string, try to parse it as JSON first
     if (typeof value === 'string') {
       try {
         const parsed = JSON.parse(value);
-        // If parsing succeeds and result is an object (not array, not null, not primitive), treat it as object
         if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          value = parsed;
+          processedValue = parsed;
         } else {
-          // Parsed to a primitive or array, use the parsed value
-          value = parsed;
+          processedValue = parsed;
         }
       } catch {
-        // Not valid JSON, treat as string primitive
-        // value remains as the original string
+        processedValue = value;
       }
     }
     
-    // If value is an object, recursively set each key-value pair
-    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-      const entries = Object.entries(value);
-      
-      // If object is empty, set it directly at the path
-      if (entries.length === 0) {
-        this.setValueAtPath(jsonData, path, value);
-        await this.writeJsonFile(filePath, jsonData);
+    for (const filePath of filePaths) {
+      try {
+        let jsonData = await this.readJsonFile(filePath);
         
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Successfully wrote empty object to ${path} in ${filePath}`,
-            },
-          ],
-        };
+        if (processedValue !== null && typeof processedValue === 'object' && !Array.isArray(processedValue)) {
+          const entries = Object.entries(processedValue);
+          
+          if (entries.length === 0) {
+            this.setValueAtPath(jsonData, path, processedValue);
+          } else {
+            for (const [key, val] of entries) {
+              const nestedPath = path ? `${path}.${key}` : key;
+              this.setValueAtPath(jsonData, nestedPath, val);
+            }
+          }
+        } else {
+          this.setValueAtPath(jsonData, path, processedValue);
+        }
+        
+        await this.writeJsonFile(filePath, jsonData);
+        results[filePath] = 'Successfully wrote';
+      } catch (error) {
+        results[filePath] = `Error: ${error instanceof Error ? error.message : String(error)}`;
       }
-      
-      const results: string[] = [];
-      
-      for (const [key, val] of entries) {
-        const nestedPath = path ? `${path}.${key}` : key;
-        this.setValueAtPath(jsonData, nestedPath, val);
-        results.push(`${nestedPath}: ${JSON.stringify(val)}`);
-      }
-      
-      await this.writeJsonFile(filePath, jsonData);
-      
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Successfully wrote object to ${path} in ${filePath}:\n${results.join('\n')}`,
-          },
-        ],
-      };
     }
-    
-    // For primitive values, set directly
-    this.setValueAtPath(jsonData, path, value);
-    await this.writeJsonFile(filePath, jsonData);
     
     return {
       content: [
         {
           type: 'text',
-          text: `Successfully wrote value to ${path} in ${filePath}`,
+          text: JSON.stringify(results, null, 2),
         },
       ],
     };
@@ -251,6 +220,30 @@ class JsonEditorMCPServer {
         const jsonData = await this.readJsonFile(filePath);
         const value = this.getValueAtPath(jsonData, path);
         results[filePath] = value;
+      } catch (error) {
+        results[filePath] = `Error: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    }
+    
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(results, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async deleteMultipleJsonValues(filePaths: string[], path: string): Promise<CallToolResult> {
+    const results: Record<string, string> = {};
+    
+    for (const filePath of filePaths) {
+      try {
+        const jsonData = await this.readJsonFile(filePath);
+        this.deleteValueAtPath(jsonData, path);
+        await this.writeJsonFile(filePath, jsonData);
+        results[filePath] = 'Successfully deleted';
       } catch (error) {
         results[filePath] = `Error: ${error instanceof Error ? error.message : String(error)}`;
       }
@@ -313,6 +306,32 @@ class JsonEditorMCPServer {
     }
     
     current[keys[keys.length - 1]] = value;
+  }
+
+  private deleteValueAtPath(obj: any, path: string): void {
+    const keys = path.split('.');
+    let current = obj;
+    
+    for (let i = 0; i < keys.length - 1; i++) {
+      const key = keys[i];
+      if (current === null || current === undefined || typeof current !== 'object') {
+        throw new Error(`Path ${path} not found: ${key} is not an object`);
+      }
+      if (!(key in current)) {
+        throw new Error(`Path ${path} not found: ${key} does not exist`);
+      }
+      current = current[key];
+    }
+    
+    const lastKey = keys[keys.length - 1];
+    if (current === null || current === undefined || typeof current !== 'object') {
+      throw new Error(`Path ${path} not found: cannot delete from non-object`);
+    }
+    if (!(lastKey in current)) {
+      throw new Error(`Path ${path} not found: ${lastKey} does not exist`);
+    }
+    
+    delete current[lastKey];
   }
 
   private deepMergeDuplicates(obj: any): any {

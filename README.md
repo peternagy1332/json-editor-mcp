@@ -13,8 +13,9 @@ A Model Context Protocol (MCP) server for editing JSON files with read, write, a
 - 🔑 **Prevents duplicate keys**: AI can't see full translation JSON and creates duplicates; targeted operations avoid this issue
 - 🔍 **Targeted reads**: Read only the values you need using dot notation paths
 - ✏️ **Targeted writes**: Update only specific paths, automatically creates missing nested structures
+- 🗑️ **Targeted deletes**: Remove specific paths from JSON files
 - 🔀 **Deep merge support**: Merge duplicate keys with recursive object merging
-- 📚 **Multi-file operations**: Read the same path from multiple JSON files efficiently
+- 📚 **Multi-file operations**: Read, write, or delete the same path from multiple JSON files efficiently
 - 📘 **TypeScript support**: Full type definitions included
 - 🤖 **MCP compliant**: Works with AI assistants (Cursor, Claude, ChatGPT) and development tools
 
@@ -51,65 +52,11 @@ cp .cursor/rules/json-editor-mcp.mdc /path/to/your/project/.cursor/rules/
 
 ## Tools
 
-### `read_json_value`
-
-Reads a value from a JSON file at a specified dot notation path. Only the specific value is read, not the entire file.
-
-**Input JSON (messages/en.json):**
-```json
-{
-  "common": {
-    "welcome": "Welcome",
-    "goodbye": "Goodbye"
-  }
-}
-```
-
-**Tool call:**
-```
-read_json_value("messages/en.json", "common.welcome")
-```
-
-**Output:**
-```json
-"Welcome"
-```
-
-### `write_json_value`
-
-Writes a value to a JSON file at a specified dot notation path. Automatically creates missing nested paths and preserves existing structure.
-
-**Input JSON (messages/en.json):**
-```json
-{
-  "common": {
-    "welcome": "Welcome"
-  }
-}
-```
-
-**Tool call:**
-```
-write_json_value("messages/en.json", "pages.about.title", "About Us")
-```
-
-**Output JSON (messages/en.json):**
-```json
-{
-  "common": {
-    "welcome": "Welcome"
-  },
-  "pages": {
-    "about": {
-      "title": "About Us"
-    }
-  }
-}
-```
-
 ### `read_multiple_json_values`
 
-Reads the same dot notation path from multiple JSON files in a single operation. Returns a map with file paths as keys and the extracted values as values. Useful for comparing translations across language files.
+Reads the same dot notation path from one or more JSON files in a single operation. Returns a map with file paths as keys and the extracted values as values. Useful for comparing translations across language files or reading from a single file.
+
+**Note:** For single file operations, pass an array with one file path: `["messages/en.json"]`
 
 **Input JSON files:**
 
@@ -141,6 +88,126 @@ read_multiple_json_values(["messages/en.json", "messages/es.json"], "common.welc
 {
   "messages/en.json": "Welcome",
   "messages/es.json": "Bienvenido"
+}
+```
+
+**Single file example:**
+```
+read_multiple_json_values(["messages/en.json"], "common.welcome")
+```
+
+**Output:**
+```json
+{
+  "messages/en.json": "Welcome"
+}
+```
+
+### `write_multiple_json_values`
+
+Writes a value to one or more JSON files at a specified dot notation path. Automatically creates missing nested paths and preserves existing structure. Returns a map with file paths as keys and operation results as values.
+
+**Note:** For single file operations, pass an array with one file path: `["messages/en.json"]`
+
+**Input JSON (messages/en.json):**
+```json
+{
+  "common": {
+    "welcome": "Welcome"
+  }
+}
+```
+
+**Tool call (single file):**
+```
+write_multiple_json_values(["messages/en.json"], "pages.about.title", "About Us")
+```
+
+**Output JSON (messages/en.json):**
+```json
+{
+  "common": {
+    "welcome": "Welcome"
+  },
+  "pages": {
+    "about": {
+      "title": "About Us"
+    }
+  }
+}
+```
+
+**Tool call (multiple files):**
+```
+write_multiple_json_values(["messages/en.json", "messages/es.json"], "common.hello", "Hello")
+```
+
+**Output:**
+```json
+{
+  "messages/en.json": "Successfully wrote",
+  "messages/es.json": "Successfully wrote"
+}
+```
+
+### `delete_multiple_json_values`
+
+Deletes a value at a specified dot notation path from one or more JSON files. Returns a map with file paths as keys and deletion results as values.
+
+**Note:** For single file operations, pass an array with one file path: `["messages/en.json"]`
+
+**Input JSON files:**
+
+**messages/en.json:**
+```json
+{
+  "common": {
+    "welcome": "Welcome",
+    "goodbye": "Goodbye"
+  }
+}
+```
+
+**messages/es.json:**
+```json
+{
+  "common": {
+    "welcome": "Bienvenido",
+    "goodbye": "Adiós"
+  }
+}
+```
+
+**Tool call:**
+```
+delete_multiple_json_values(["messages/en.json", "messages/es.json"], "common.goodbye")
+```
+
+**Output:**
+```json
+{
+  "messages/en.json": "Successfully deleted",
+  "messages/es.json": "Successfully deleted"
+}
+```
+
+**Output JSON files:**
+
+**messages/en.json:**
+```json
+{
+  "common": {
+    "welcome": "Welcome"
+  }
+}
+```
+
+**messages/es.json:**
+```json
+{
+  "common": {
+    "welcome": "Bienvenido"
+  }
 }
 ```
 

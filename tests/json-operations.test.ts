@@ -134,6 +134,62 @@ describe('JSON Operations', () => {
     });
   });
 
+  describe('deleteValueAtPath', () => {
+    it('should delete simple values', () => {
+      const obj: any = { "key": "value", "other": "otherValue" };
+      server.deleteValueAtPath(obj, "key");
+      expect(obj).toEqual({ "other": "otherValue" });
+      expect(obj.key).toBeUndefined();
+    });
+
+    it('should delete nested values', () => {
+      const obj: any = {
+        "level1": {
+          "level2": {
+            "key1": "value1",
+            "key2": "value2"
+          }
+        }
+      };
+      server.deleteValueAtPath(obj, "level1.level2.key1");
+      expect(obj.level1.level2).toEqual({ "key2": "value2" });
+      expect(obj.level1.level2.key1).toBeUndefined();
+    });
+
+    it('should delete top-level keys', () => {
+      const obj: any = { "key1": "value1", "key2": "value2", "key3": "value3" };
+      server.deleteValueAtPath(obj, "key2");
+      expect(obj).toEqual({ "key1": "value1", "key3": "value3" });
+    });
+
+    it('should throw error for non-existent path', () => {
+      const obj: any = { "key": "value" };
+      expect(() => server.deleteValueAtPath(obj, "nonexistent")).toThrow("Path nonexistent not found: nonexistent does not exist");
+    });
+
+    it('should throw error for non-existent nested path', () => {
+      const obj: any = { "level1": { "level2": { "key": "value" } } };
+      expect(() => server.deleteValueAtPath(obj, "level1.level2.nonexistent")).toThrow("Path level1.level2.nonexistent not found: nonexistent does not exist");
+    });
+
+    it('should throw error when trying to delete from non-object', () => {
+      const obj: any = { "key": "value" };
+      expect(() => server.deleteValueAtPath(obj, "key.nested")).toThrow("Path key.nested not found: nested is not an object");
+    });
+
+    it('should handle deleting last key in nested object', () => {
+      const obj: any = {
+        "level1": {
+          "level2": {
+            "key": "value"
+          }
+        }
+      };
+      server.deleteValueAtPath(obj, "level1.level2.key");
+      expect(obj.level1.level2).toEqual({});
+    });
+  });
+
   describe('Integration tests', () => {
     it('should handle complex nested operations', () => {
       const obj: any = {};

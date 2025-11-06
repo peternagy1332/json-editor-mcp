@@ -108,6 +108,32 @@ export class JsonEditorMCPServerTestable {
     current[keys[keys.length - 1]] = value;
   }
 
+  public deleteValueAtPath(obj: any, path: string): void {
+    const keys = path.split('.');
+    let current = obj;
+    
+    for (let i = 0; i < keys.length - 1; i++) {
+      const key = keys[i];
+      if (current === null || current === undefined || typeof current !== 'object') {
+        throw new Error(`Path ${path} not found: ${key} is not an object`);
+      }
+      if (!(key in current)) {
+        throw new Error(`Path ${path} not found: ${key} does not exist`);
+      }
+      current = current[key];
+    }
+    
+    const lastKey = keys[keys.length - 1];
+    if (current === null || current === undefined || typeof current !== 'object') {
+      throw new Error(`Path ${path} not found: cannot delete from non-object`);
+    }
+    if (!(lastKey in current)) {
+      throw new Error(`Path ${path} not found: ${lastKey} does not exist`);
+    }
+    
+    delete current[lastKey];
+  }
+
   public async readJsonFile(filePath: string): Promise<any> {
     try {
       const content = await fs.readFile(filePath, 'utf-8');
@@ -130,5 +156,85 @@ export class JsonEditorMCPServerTestable {
     const content = JSON.stringify(data, null, 2);
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, content, 'utf-8');
+  }
+
+  public async readMultipleJsonValues(filePaths: string[], path: string): Promise<Record<string, any>> {
+    const results: Record<string, any> = {};
+    
+    for (const filePath of filePaths) {
+      try {
+        const jsonData = await this.readJsonFile(filePath);
+        const value = this.getValueAtPath(jsonData, path);
+        results[filePath] = value;
+      } catch (error) {
+        results[filePath] = `Error: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    }
+    
+    return results;
+  }
+
+  public async writeMultipleJsonValues(filePaths: string[], path: string, value: any): Promise<Record<string, string>> {
+    const results: Record<string, string> = {};
+    
+    let processedValue = value;
+    
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          processedValue = parsed;
+        } else {
+          processedValue = parsed;
+        }
+      } catch {
+        processedValue = value;
+      }
+    }
+    
+    for (const filePath of filePaths) {
+      try {
+        let jsonData = await this.readJsonFile(filePath);
+        
+        if (processedValue !== null && typeof processedValue === 'object' && !Array.isArray(processedValue)) {
+          const entries = Object.entries(processedValue);
+          
+          if (entries.length === 0) {
+            this.setValueAtPath(jsonData, path, processedValue);
+          } else {
+            for (const [key, val] of entries) {
+              const nestedPath = path ? `${path}.${key}` : key;
+              this.setValueAtPath(jsonData, nestedPath, val);
+            }
+          }
+        } else {
+          this.setValueAtPath(jsonData, path, processedValue);
+        }
+        
+        await this.writeJsonFile(filePath, jsonData);
+        results[filePath] = 'Successfully wrote';
+      } catch (error) {
+        results[filePath] = `Error: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    }
+    
+    return results;
+  }
+
+  public async deleteMultipleJsonValues(filePaths: string[], path: string): Promise<Record<string, string>> {
+    const results: Record<string, string> = {};
+    
+    for (const filePath of filePaths) {
+      try {
+        const jsonData = await this.readJsonFile(filePath);
+        this.deleteValueAtPath(jsonData, path);
+        await this.writeJsonFile(filePath, jsonData);
+        results[filePath] = 'Successfully deleted';
+      } catch (error) {
+        results[filePath] = `Error: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    }
+    
+    return results;
   }
 }

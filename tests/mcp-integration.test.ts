@@ -6,57 +6,6 @@ import path from 'path';
 
 // Mock the MCP server for integration testing
 class MockJsonEditorMCPServer extends JsonEditorMCPServerTestable {
-  public async readJsonValue(filePath: string, path: string): Promise<any> {
-    const jsonData = await this.readJsonFile(filePath);
-    const value = this.getValueAtPath(jsonData, path);
-    return value;
-  }
-
-  public async writeJsonValue(filePath: string, path: string, value: any): Promise<void> {
-    let jsonData: any = {};
-    try {
-      jsonData = await this.readJsonFile(filePath);
-    } catch (error) {
-      // If file doesn't exist, start with empty object
-      jsonData = {};
-    }
-    
-    // If value is a string, try to parse it as JSON first
-    if (typeof value === 'string') {
-      try {
-        const parsed = JSON.parse(value);
-        // If parsing succeeds and result is an object (not array, not null, not primitive), treat it as object
-        if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          value = parsed;
-        } else {
-          // Parsed to a primitive or array, use the parsed value
-          value = parsed;
-        }
-      } catch {
-        // Not valid JSON, treat as string primitive
-        // value remains as the original string
-      }
-    }
-    
-    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-      const entries = Object.entries(value);
-      
-      // If object is empty, set it directly at the path
-      if (entries.length === 0) {
-        this.setValueAtPath(jsonData, path, value);
-      } else {
-        for (const [key, val] of entries) {
-          const nestedPath = path ? `${path}.${key}` : key;
-          this.setValueAtPath(jsonData, nestedPath, val);
-        }
-      }
-    } else {
-      this.setValueAtPath(jsonData, path, value);
-    }
-    
-    await this.writeJsonFile(filePath, jsonData);
-  }
-
   public async mergeDuplicateKeys(filePath: string): Promise<void> {
     const jsonData = await this.readJsonFile(filePath);
     const mergedData = this.deepMergeDuplicates(jsonData);
@@ -80,90 +29,98 @@ describe('MCP Integration Tests', () => {
     await fs.mkdir(testDir, { recursive: true });
   });
 
-  describe('readJsonValue', () => {
+  describe('readMultipleJsonValues', () => {
     it('should read simple values from JSON files', async () => {
       const testData = { "key": "value" };
       const filePath = await createTestFile('simple.json', testData);
       
-      const result = await server.readJsonValue(filePath, "key");
-      expect(result).toBe("value");
+      const result = await server.readMultipleJsonValues([filePath], "key");
+      expect(result[filePath]).toBe("value");
     });
 
     it('should read nested values from JSON files', async () => {
       const testData = { "level1": { "level2": { "key": "value" } } };
       const filePath = await createTestFile('nested.json', testData);
       
-      const result = await server.readJsonValue(filePath, "level1.level2.key");
-      expect(result).toBe("value");
+      const result = await server.readMultipleJsonValues([filePath], "level1.level2.key");
+      expect(result[filePath]).toBe("value");
     });
 
-    it('should throw error for non-existent path', async () => {
+    it('should handle error for non-existent path', async () => {
       const testData = { "key": "value" };
       const filePath = await createTestFile('error.json', testData);
       
-      await expect(server.readJsonValue(filePath, "nonexistent")).rejects.toThrow();
+      const result = await server.readMultipleJsonValues([filePath], "nonexistent");
+      expect(result[filePath]).toContain("Error");
     });
 
-    it('should return empty object for non-existent file', async () => {
-      await expect(server.readJsonValue('nonexistent.json', "key")).rejects.toThrow();
+    it('should handle non-existent file', async () => {
+      const result = await server.readMultipleJsonValues(['nonexistent.json'], "key");
+      expect(result['nonexistent.json']).toContain("Error");
     });
   });
 
-  describe('writeJsonValue', () => {
+  describe('writeMultipleJsonValues', () => {
     it('should write simple values to JSON files', async () => {
       const filePath = path.join(testDir, 'write-simple.json');
       
-      await server.writeJsonValue(filePath, "key", "value");
+      const result = await server.writeMultipleJsonValues([filePath], "key", "value");
+      expect(result[filePath]).toBe("Successfully wrote");
       
-      const result = await readTestFile(filePath);
-      expect(result).toEqual({ "key": "value" });
+      const fileContent = await readTestFile(filePath);
+      expect(fileContent).toEqual({ "key": "value" });
     });
 
     it('should write nested values to JSON files', async () => {
       const filePath = path.join(testDir, 'write-nested.json');
       
-      await server.writeJsonValue(filePath, "level1.level2.key", "value");
+      const result = await server.writeMultipleJsonValues([filePath], "level1.level2.key", "value");
+      expect(result[filePath]).toBe("Successfully wrote");
       
-      const result = await readTestFile(filePath);
-      expect(result).toEqual({ "level1": { "level2": { "key": "value" } } });
+      const fileContent = await readTestFile(filePath);
+      expect(fileContent).toEqual({ "level1": { "level2": { "key": "value" } } });
     });
 
     it('should write objects to JSON files', async () => {
       const filePath = path.join(testDir, 'write-object.json');
       const objectValue = { "nested": { "key": "value" } };
       
-      await server.writeJsonValue(filePath, "object", objectValue);
+      const result = await server.writeMultipleJsonValues([filePath], "object", objectValue);
+      expect(result[filePath]).toBe("Successfully wrote");
       
-      const result = await readTestFile(filePath);
-      expect(result).toEqual({ "object": objectValue });
+      const fileContent = await readTestFile(filePath);
+      expect(fileContent).toEqual({ "object": objectValue });
     });
 
     it('should update existing values in JSON files', async () => {
       const initialData = { "key": "oldValue" };
       const filePath = await createTestFile('update.json', initialData);
       
-      await server.writeJsonValue(filePath, "key", "newValue");
+      const result = await server.writeMultipleJsonValues([filePath], "key", "newValue");
+      expect(result[filePath]).toBe("Successfully wrote");
       
-      const result = await readTestFile(filePath);
-      expect(result).toEqual({ "key": "newValue" });
+      const fileContent = await readTestFile(filePath);
+      expect(fileContent).toEqual({ "key": "newValue" });
     });
 
     it('should create missing paths automatically', async () => {
       const filePath = path.join(testDir, 'create-paths.json');
       
-      await server.writeJsonValue(filePath, "a.b.c.d", "value");
+      const result = await server.writeMultipleJsonValues([filePath], "a.b.c.d", "value");
+      expect(result[filePath]).toBe("Successfully wrote");
       
-      const result = await readTestFile(filePath);
-      expect(result).toEqual({ "a": { "b": { "c": { "d": "value" } } } });
+      const fileContent = await readTestFile(filePath);
+      expect(fileContent).toEqual({ "a": { "b": { "c": { "d": "value" } } } });
     });
 
     it('should parse JSON string and insert as nested object', async () => {
       const filePath = path.join(testDir, 'json-string-object.json');
       
-      await server.writeJsonValue(filePath, "test", '{"key": "value", "nested": {"foo": "bar"}}');
+      const result = await server.writeMultipleJsonValues([filePath], "test", '{"key": "value", "nested": {"foo": "bar"}}');
+      expect(result[filePath]).toBe("Successfully wrote");
       
-      const result = await readTestFile(filePath);
-      expect(result).toEqual({
+      const fileContent = await readTestFile(filePath);
+      expect(fileContent).toEqual({
         "test": {
           "key": "value",
           "nested": {
@@ -176,10 +133,11 @@ describe('MCP Integration Tests', () => {
     it('should parse JSON string and recursively create nested paths', async () => {
       const filePath = path.join(testDir, 'json-string-nested.json');
       
-      await server.writeJsonValue(filePath, "level1.level2", '{"key1": "value1", "key2": "value2"}');
+      const result = await server.writeMultipleJsonValues([filePath], "level1.level2", '{"key1": "value1", "key2": "value2"}');
+      expect(result[filePath]).toBe("Successfully wrote");
       
-      const result = await readTestFile(filePath);
-      expect(result).toEqual({
+      const fileContent = await readTestFile(filePath);
+      expect(fileContent).toEqual({
         "level1": {
           "level2": {
             "key1": "value1",
@@ -192,21 +150,22 @@ describe('MCP Integration Tests', () => {
     it('should treat invalid JSON string as string primitive', async () => {
       const filePath = path.join(testDir, 'invalid-json-string.json');
       
-      await server.writeJsonValue(filePath, "key", "not valid json {");
+      const result = await server.writeMultipleJsonValues([filePath], "key", "not valid json {");
+      expect(result[filePath]).toBe("Successfully wrote");
       
-      const result = await readTestFile(filePath);
-      expect(result).toEqual({ "key": "not valid json {" });
+      const fileContent = await readTestFile(filePath);
+      expect(fileContent).toEqual({ "key": "not valid json {" });
     });
 
     it('should parse JSON string with primitive value', async () => {
       const filePath = path.join(testDir, 'json-string-primitive.json');
       
-      await server.writeJsonValue(filePath, "number", "123");
-      await server.writeJsonValue(filePath, "boolean", "true");
-      await server.writeJsonValue(filePath, "nullValue", "null");
+      await server.writeMultipleJsonValues([filePath], "number", "123");
+      await server.writeMultipleJsonValues([filePath], "boolean", "true");
+      await server.writeMultipleJsonValues([filePath], "nullValue", "null");
       
-      const result = await readTestFile(filePath);
-      expect(result).toEqual({
+      const fileContent = await readTestFile(filePath);
+      expect(fileContent).toEqual({
         "number": 123,
         "boolean": true,
         "nullValue": null
@@ -216,10 +175,11 @@ describe('MCP Integration Tests', () => {
     it('should parse JSON string with array', async () => {
       const filePath = path.join(testDir, 'json-string-array.json');
       
-      await server.writeJsonValue(filePath, "items", '[1, 2, 3, "four"]');
+      const result = await server.writeMultipleJsonValues([filePath], "items", '[1, 2, 3, "four"]');
+      expect(result[filePath]).toBe("Successfully wrote");
       
-      const result = await readTestFile(filePath);
-      expect(result).toEqual({
+      const fileContent = await readTestFile(filePath);
+      expect(fileContent).toEqual({
         "items": [1, 2, 3, "four"]
       });
     });
@@ -227,19 +187,35 @@ describe('MCP Integration Tests', () => {
     it('should handle regular string primitive (not JSON)', async () => {
       const filePath = path.join(testDir, 'regular-string.json');
       
-      await server.writeJsonValue(filePath, "message", "Hello, world!");
+      const result = await server.writeMultipleJsonValues([filePath], "message", "Hello, world!");
+      expect(result[filePath]).toBe("Successfully wrote");
       
-      const result = await readTestFile(filePath);
-      expect(result).toEqual({ "message": "Hello, world!" });
+      const fileContent = await readTestFile(filePath);
+      expect(fileContent).toEqual({ "message": "Hello, world!" });
     });
 
     it('should handle empty JSON object string', async () => {
       const filePath = path.join(testDir, 'empty-json-object.json');
       
-      await server.writeJsonValue(filePath, "empty", "{}");
+      const result = await server.writeMultipleJsonValues([filePath], "empty", "{}");
+      expect(result[filePath]).toBe("Successfully wrote");
       
-      const result = await readTestFile(filePath);
-      expect(result).toEqual({ "empty": {} });
+      const fileContent = await readTestFile(filePath);
+      expect(fileContent).toEqual({ "empty": {} });
+    });
+
+    it('should write to multiple files', async () => {
+      const filePath1 = path.join(testDir, 'multi-write1.json');
+      const filePath2 = path.join(testDir, 'multi-write2.json');
+      
+      const result = await server.writeMultipleJsonValues([filePath1, filePath2], "key", "value");
+      expect(result[filePath1]).toBe("Successfully wrote");
+      expect(result[filePath2]).toBe("Successfully wrote");
+      
+      const fileContent1 = await readTestFile(filePath1);
+      const fileContent2 = await readTestFile(filePath2);
+      expect(fileContent1).toEqual({ "key": "value" });
+      expect(fileContent2).toEqual({ "key": "value" });
     });
   });
 
@@ -330,6 +306,169 @@ describe('MCP Integration Tests', () => {
     });
   });
 
+  describe('deleteMultipleJsonValues', () => {
+    it('should delete a value from multiple JSON files', async () => {
+      const testData1 = {
+        "common": {
+          "welcome": "Welcome",
+          "goodbye": "Goodbye"
+        },
+        "pages": {
+          "home": {
+            "title": "Home"
+          }
+        }
+      };
+      const testData2 = {
+        "common": {
+          "welcome": "Bienvenue",
+          "goodbye": "Au revoir"
+        },
+        "pages": {
+          "home": {
+            "title": "Accueil"
+          }
+        }
+      };
+      
+      const filePath1 = await createTestFile('delete-test1.json', testData1);
+      const filePath2 = await createTestFile('delete-test2.json', testData2);
+      
+      const results = await server.deleteMultipleJsonValues([filePath1, filePath2], "common.goodbye");
+      
+      expect(results[filePath1]).toBe("Successfully deleted");
+      expect(results[filePath2]).toBe("Successfully deleted");
+      
+      const result1 = await readTestFile(filePath1);
+      const result2 = await readTestFile(filePath2);
+      
+      expect(result1.common).toEqual({ "welcome": "Welcome" });
+      expect(result2.common).toEqual({ "welcome": "Bienvenue" });
+      expect(result1.common.goodbye).toBeUndefined();
+      expect(result2.common.goodbye).toBeUndefined();
+    });
+
+    it('should delete nested values from multiple JSON files', async () => {
+      const testData1 = {
+        "level1": {
+          "level2": {
+            "key1": "value1",
+            "key2": "value2"
+          }
+        }
+      };
+      const testData2 = {
+        "level1": {
+          "level2": {
+            "key1": "value3",
+            "key2": "value4"
+          }
+        }
+      };
+      
+      const filePath1 = await createTestFile('delete-nested1.json', testData1);
+      const filePath2 = await createTestFile('delete-nested2.json', testData2);
+      
+      const results = await server.deleteMultipleJsonValues([filePath1, filePath2], "level1.level2.key1");
+      
+      expect(results[filePath1]).toBe("Successfully deleted");
+      expect(results[filePath2]).toBe("Successfully deleted");
+      
+      const result1 = await readTestFile(filePath1);
+      const result2 = await readTestFile(filePath2);
+      
+      expect(result1.level1.level2).toEqual({ "key2": "value2" });
+      expect(result2.level1.level2).toEqual({ "key2": "value4" });
+    });
+
+    it('should handle errors gracefully when path does not exist in some files', async () => {
+      const testData1 = {
+        "common": {
+          "welcome": "Welcome"
+        }
+      };
+      const testData2 = {
+        "common": {
+          "welcome": "Bienvenue",
+          "goodbye": "Au revoir"
+        }
+      };
+      
+      const filePath1 = await createTestFile('delete-error1.json', testData1);
+      const filePath2 = await createTestFile('delete-error2.json', testData2);
+      
+      const results = await server.deleteMultipleJsonValues([filePath1, filePath2], "common.goodbye");
+      
+      expect(results[filePath1]).toContain("Error");
+      expect(results[filePath2]).toBe("Successfully deleted");
+      
+      const result1 = await readTestFile(filePath1);
+      const result2 = await readTestFile(filePath2);
+      
+      expect(result1.common).toEqual({ "welcome": "Welcome" });
+      expect(result2.common).toEqual({ "welcome": "Bienvenue" });
+    });
+
+    it('should handle non-existent files gracefully', async () => {
+      const testData = {
+        "common": {
+          "welcome": "Welcome",
+          "goodbye": "Goodbye"
+        }
+      };
+      
+      const filePath1 = await createTestFile('delete-existing.json', testData);
+      const filePath2 = path.join(testDir, 'delete-nonexistent.json');
+      
+      const results = await server.deleteMultipleJsonValues([filePath1, filePath2], "common.goodbye");
+      
+      expect(results[filePath1]).toBe("Successfully deleted");
+      expect(results[filePath2]).toContain("Error");
+      
+      const result1 = await readTestFile(filePath1);
+      expect(result1.common).toEqual({ "welcome": "Welcome" });
+    });
+
+    it('should delete top-level keys from multiple files', async () => {
+      const testData1 = {
+        "key1": "value1",
+        "key2": "value2",
+        "key3": "value3"
+      };
+      const testData2 = {
+        "key1": "value4",
+        "key2": "value5",
+        "key3": "value6"
+      };
+      
+      const filePath1 = await createTestFile('delete-top1.json', testData1);
+      const filePath2 = await createTestFile('delete-top2.json', testData2);
+      
+      const results = await server.deleteMultipleJsonValues([filePath1, filePath2], "key2");
+      
+      expect(results[filePath1]).toBe("Successfully deleted");
+      expect(results[filePath2]).toBe("Successfully deleted");
+      
+      const result1 = await readTestFile(filePath1);
+      const result2 = await readTestFile(filePath2);
+      
+      expect(result1).toEqual({
+        "key1": "value1",
+        "key3": "value3"
+      });
+      expect(result2).toEqual({
+        "key1": "value4",
+        "key3": "value6"
+      });
+    });
+
+    it('should handle empty file paths array', async () => {
+      const results = await server.deleteMultipleJsonValues([], "common.welcome");
+      
+      expect(results).toEqual({});
+    });
+  });
+
   describe('End-to-End Workflows', () => {
     it('should handle a complete i18n translation workflow', async () => {
       // Start with a base translation file
@@ -347,8 +486,8 @@ describe('MCP Integration Tests', () => {
       const filePath = await createTestFile('i18n-en.json', baseTranslations);
       
       // Add new translations
-      await server.writeJsonValue(filePath, "common.hello", "Hello");
-      await server.writeJsonValue(filePath, "pages.about.title", "About Us");
+      await server.writeMultipleJsonValues([filePath], "common.hello", "Hello");
+      await server.writeMultipleJsonValues([filePath], "pages.about.title", "About Us");
       
       // Verify additions
       let result = await readTestFile(filePath);
@@ -401,9 +540,9 @@ describe('MCP Integration Tests', () => {
       const filePath = await createTestFile('config.json', initialConfig);
       
       // Update configuration
-      await server.writeJsonValue(filePath, "database.host", "production.example.com");
-      await server.writeJsonValue(filePath, "database.ssl", true);
-      await server.writeJsonValue(filePath, "app.environment", "production");
+      await server.writeMultipleJsonValues([filePath], "database.host", "production.example.com");
+      await server.writeMultipleJsonValues([filePath], "database.ssl", true);
+      await server.writeMultipleJsonValues([filePath], "app.environment", "production");
       
       // Verify updates
       let result = await readTestFile(filePath);
@@ -412,8 +551,8 @@ describe('MCP Integration Tests', () => {
       expect(result.app.environment).toBe("production");
       
       // Read specific values
-      const dbHost = await server.readJsonValue(filePath, "database.host");
-      expect(dbHost).toBe("production.example.com");
+      const readResult = await server.readMultipleJsonValues([filePath], "database.host");
+      expect(readResult[filePath]).toBe("production.example.com");
     });
   });
 });
