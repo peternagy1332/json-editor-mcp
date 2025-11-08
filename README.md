@@ -103,11 +103,9 @@ read_multiple_json_values(["messages/en.json"], "common.welcome")
 }
 ```
 
-### `write_multiple_json_values`
+### `write_json_values`
 
-Writes a value to one or more JSON files at a specified dot notation path. Automatically creates missing nested paths and preserves existing structure. Returns a map with file paths as keys and operation results as values.
-
-**Note:** For single file operations, pass an array with one file path: `["messages/en.json"]`
+Writes a value to a JSON file at a specified dot notation path. Automatically creates missing nested paths and preserves existing structure.
 
 **Input JSON (messages/en.json):**
 ```json
@@ -118,9 +116,9 @@ Writes a value to one or more JSON files at a specified dot notation path. Autom
 }
 ```
 
-**Tool call (single file):**
+**Tool call:**
 ```
-write_multiple_json_values(["messages/en.json"], "pages.about.title", "About Us")
+write_json_values("/absolute/path/to/messages/en.json", "pages.about.title", "About Us")
 ```
 
 **Output JSON (messages/en.json):**
@@ -137,17 +135,9 @@ write_multiple_json_values(["messages/en.json"], "pages.about.title", "About Us"
 }
 ```
 
-**Tool call (multiple files):**
-```
-write_multiple_json_values(["messages/en.json", "messages/es.json"], "common.hello", "Hello")
-```
-
 **Output:**
-```json
-{
-  "messages/en.json": "Successfully wrote",
-  "messages/es.json": "Successfully wrote"
-}
+```
+Successfully wrote to /absolute/path/to/messages/en.json
 ```
 
 ### `delete_multiple_json_values`

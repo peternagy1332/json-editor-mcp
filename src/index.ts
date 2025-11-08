@@ -73,15 +73,14 @@ class JsonEditorMCPServer {
             },
           },
           {
-            name: 'write_multiple_json_values',
-            description: 'Write a value to multiple JSON files at a specified path using dot notation. Creates missing paths automatically. Returns a map of file paths to write results.',
+            name: 'write_json_values',
+            description: 'Write a value to a JSON file at a specified path using dot notation. Creates missing paths automatically.',
             inputSchema: {
               type: 'object',
               properties: {
-                filePaths: {
-                  type: 'array',
-                  items: { type: 'string' },
-                  description: 'Array of paths to JSON files',
+                filePath: {
+                  type: 'string',
+                  description: 'Absolute path to the JSON file',
                 },
                 path: {
                   type: 'string',
@@ -91,7 +90,7 @@ class JsonEditorMCPServer {
                   description: 'Value to write (any JSON-serializable type)',
                 },
               },
-              required: ['filePaths', 'path', 'value'],
+              required: ['filePath', 'path', 'value'],
             },
           },
           {
@@ -130,8 +129,8 @@ class JsonEditorMCPServer {
             return await this.mergeDuplicateKeys(args.filePath as string);
           case 'read_multiple_json_values':
             return await this.readMultipleJsonValues(args.filePaths as string[], args.path as string);
-          case 'write_multiple_json_values':
-            return await this.writeMultipleJsonValues(args.filePaths as string[], args.path as string, args.value);
+          case 'write_json_values':
+            return await this.writeJsonValues(args.filePath as string, args.path as string, args.value);
           case 'delete_multiple_json_values':
             return await this.deleteMultipleJsonValues(args.filePaths as string[], args.path as string);
           default:
@@ -170,12 +169,8 @@ class JsonEditorMCPServer {
     }
   }
 
-  private async writeMultipleJsonValues(filePaths: string[], path: string, value: any): Promise<CallToolResult> {
-    for (const filePath of filePaths) {
-      this.validateAbsolutePath(filePath);
-    }
-    
-    const results: Record<string, string> = {};
+  private async writeJsonValues(filePath: string, path: string, value: any): Promise<CallToolResult> {
+    this.validateAbsolutePath(filePath);
     
     let processedValue = value;
     
@@ -196,40 +191,44 @@ class JsonEditorMCPServer {
       }
     }
     
-    for (const filePath of filePaths) {
-      try {
-        let jsonData = await this.readJsonFile(filePath);
+    try {
+      let jsonData = await this.readJsonFile(filePath);
+      
+      if (processedValue !== null && typeof processedValue === 'object' && !Array.isArray(processedValue)) {
+        const entries = Object.entries(processedValue);
         
-        if (processedValue !== null && typeof processedValue === 'object' && !Array.isArray(processedValue)) {
-          const entries = Object.entries(processedValue);
-          
-          if (entries.length === 0) {
-            this.setValueAtPath(jsonData, path, processedValue);
-          } else {
-            for (const [key, val] of entries) {
-              const nestedPath = path ? `${path}.${key}` : key;
-              this.setValueAtPath(jsonData, nestedPath, val);
-            }
-          }
-        } else {
+        if (entries.length === 0) {
           this.setValueAtPath(jsonData, path, processedValue);
+        } else {
+          for (const [key, val] of entries) {
+            const nestedPath = path ? `${path}.${key}` : key;
+            this.setValueAtPath(jsonData, nestedPath, val);
+          }
         }
-        
-        await this.writeJsonFile(filePath, jsonData);
-        results[filePath] = 'Successfully wrote';
-      } catch (error) {
-        results[filePath] = `Error: ${error instanceof Error ? error.message : String(error)}`;
+      } else {
+        this.setValueAtPath(jsonData, path, processedValue);
       }
+      
+      await this.writeJsonFile(filePath, jsonData);
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Successfully wrote to ${filePath}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+      };
     }
-    
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(results, null, 2),
-        },
-      ],
-    };
   }
 
   private async mergeDuplicateKeys(filePath: string): Promise<CallToolResult> {
