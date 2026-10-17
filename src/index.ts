@@ -9,6 +9,12 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { promises as fs } from 'fs';
 import path from 'path';
+import {
+  assignOwnProperty,
+  deleteValueAtPath,
+  getValueAtPath,
+  setValueAtPath,
+} from './json-path.js';
 
 class JsonEditorMCPServer {
   private server: Server;
@@ -198,15 +204,15 @@ class JsonEditorMCPServer {
         const entries = Object.entries(processedValue);
         
         if (entries.length === 0) {
-          this.setValueAtPath(jsonData, path, processedValue);
+          setValueAtPath(jsonData, path, processedValue);
         } else {
           for (const [key, val] of entries) {
             const nestedPath = path ? `${path}.${key}` : key;
-            this.setValueAtPath(jsonData, nestedPath, val);
+            setValueAtPath(jsonData, nestedPath, val);
           }
         }
       } else {
-        this.setValueAtPath(jsonData, path, processedValue);
+        setValueAtPath(jsonData, path, processedValue);
       }
       
       await this.writeJsonFile(filePath, jsonData);
@@ -257,7 +263,7 @@ class JsonEditorMCPServer {
     for (const filePath of filePaths) {
       try {
         const jsonData = await this.readJsonFile(filePath);
-        const value = this.getValueAtPath(jsonData, path);
+        const value = getValueAtPath(jsonData, path);
         results[filePath] = value;
       } catch (error) {
         results[filePath] = `Error: ${error instanceof Error ? error.message : String(error)}`;
@@ -284,7 +290,7 @@ class JsonEditorMCPServer {
     for (const filePath of filePaths) {
       try {
         const jsonData = await this.readJsonFile(filePath);
-        this.deleteValueAtPath(jsonData, path);
+        deleteValueAtPath(jsonData, path);
         await this.writeJsonFile(filePath, jsonData);
         results[filePath] = 'Successfully deleted';
       } catch (error) {
@@ -320,64 +326,6 @@ class JsonEditorMCPServer {
     await fs.writeFile(filePath, content, 'utf-8');
   }
 
-  private getValueAtPath(obj: any, path: string): any {
-    const keys = path.split('.');
-    let current = obj;
-    
-    for (const key of keys) {
-      if (current === null || current === undefined || typeof current !== 'object') {
-        throw new Error(`Path ${path} not found: ${key} is not an object`);
-      }
-      if (!(key in current)) {
-        throw new Error(`Path ${path} not found: ${key} does not exist`);
-      }
-      current = current[key];
-    }
-    
-    return current;
-  }
-
-  private setValueAtPath(obj: any, path: string, value: any): void {
-    const keys = path.split('.');
-    let current = obj;
-    
-    for (let i = 0; i < keys.length - 1; i++) {
-      const key = keys[i];
-      if (!(key in current) || typeof current[key] !== 'object' || current[key] === null) {
-        current[key] = {};
-      }
-      current = current[key];
-    }
-    
-    current[keys[keys.length - 1]] = value;
-  }
-
-  private deleteValueAtPath(obj: any, path: string): void {
-    const keys = path.split('.');
-    let current = obj;
-    
-    for (let i = 0; i < keys.length - 1; i++) {
-      const key = keys[i];
-      if (current === null || current === undefined || typeof current !== 'object') {
-        throw new Error(`Path ${path} not found: ${key} is not an object`);
-      }
-      if (!(key in current)) {
-        throw new Error(`Path ${path} not found: ${key} does not exist`);
-      }
-      current = current[key];
-    }
-    
-    const lastKey = keys[keys.length - 1];
-    if (current === null || current === undefined || typeof current !== 'object') {
-      throw new Error(`Path ${path} not found: cannot delete from non-object`);
-    }
-    if (!(lastKey in current)) {
-      throw new Error(`Path ${path} not found: ${lastKey} does not exist`);
-    }
-    
-    delete current[lastKey];
-  }
-
   private deepMergeDuplicates(obj: any): any {
     if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
       return obj;
@@ -393,14 +341,14 @@ class JsonEditorMCPServer {
         if (typeof existingValue === 'object' && typeof value === 'object' && 
             existingValue !== null && value !== null && 
             !Array.isArray(existingValue) && !Array.isArray(value)) {
-          result[key] = this.deepMerge(existingValue, value);
+          assignOwnProperty(result, key, this.deepMerge(existingValue, value));
         } else {
           // Last value wins for primitives or incompatible types
-          result[key] = this.deepMergeDuplicates(value);
+          assignOwnProperty(result, key, this.deepMergeDuplicates(value));
         }
       } else {
         seenKeys.add(key);
-        result[key] = this.deepMergeDuplicates(value);
+        assignOwnProperty(result, key, this.deepMergeDuplicates(value));
       }
     }
 
@@ -419,12 +367,13 @@ class JsonEditorMCPServer {
     const result = { ...target };
 
     for (const [key, value] of Object.entries(source)) {
-      if (key in result && typeof result[key] === 'object' && typeof value === 'object' && 
-          result[key] !== null && value !== null && 
-          !Array.isArray(result[key]) && !Array.isArray(value)) {
-        result[key] = this.deepMerge(result[key], value);
+      const existing: unknown = Object.hasOwn(result, key) ? result[key] : undefined;
+      if (typeof existing === 'object' && typeof value === 'object' &&
+          existing !== null && value !== null &&
+          !Array.isArray(existing) && !Array.isArray(value)) {
+        assignOwnProperty(result, key, this.deepMerge(existing, value));
       } else {
-        result[key] = value;
+        assignOwnProperty(result, key, value);
       }
     }
 

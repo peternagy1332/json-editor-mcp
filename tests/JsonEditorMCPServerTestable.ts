@@ -1,5 +1,11 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import {
+  assignOwnProperty,
+  deleteValueAtPath as removeValueAtPath,
+  getValueAtPath as readValueAtPath,
+  setValueAtPath as writeValueAtPath,
+} from '../src/json-path.js';
 
 // Testable version of JsonEditorMCPServer that exposes private methods
 // This version doesn't import the MCP SDK to avoid ESM issues in Jest
@@ -36,14 +42,14 @@ export class JsonEditorMCPServerTestable {
         if (typeof existingValue === 'object' && typeof value === 'object' && 
             existingValue !== null && value !== null && 
             !Array.isArray(existingValue) && !Array.isArray(value)) {
-          result[key] = this.deepMerge(existingValue, value, visited);
+          assignOwnProperty(result, key, this.deepMerge(existingValue, value, visited));
         } else {
           // Last value wins for primitives or incompatible types
-          result[key] = value;
+          assignOwnProperty(result, key, value);
         }
       } else {
         seenKeys.add(key);
-        result[key] = this.deepMergeDuplicates(value, visited);
+        assignOwnProperty(result, key, this.deepMergeDuplicates(value, visited));
       }
     }
 
@@ -69,74 +75,29 @@ export class JsonEditorMCPServerTestable {
     const result = { ...target };
 
     for (const [key, value] of Object.entries(source)) {
-      if (key in result && typeof result[key] === 'object' && typeof value === 'object' && 
-          result[key] !== null && value !== null && 
-          !Array.isArray(result[key]) && !Array.isArray(value)) {
-        result[key] = this.deepMerge(result[key], value, visited);
+      const existing: unknown = Object.hasOwn(result, key) ? result[key] : undefined;
+      if (typeof existing === 'object' && typeof value === 'object' &&
+          existing !== null && value !== null &&
+          !Array.isArray(existing) && !Array.isArray(value)) {
+        assignOwnProperty(result, key, this.deepMerge(existing, value, visited));
       } else {
-        result[key] = value;
+        assignOwnProperty(result, key, value);
       }
     }
 
     return result;
   }
 
-  public getValueAtPath(obj: any, path: string): any {
-    const keys = path.split('.');
-    let current = obj;
-    
-    for (const key of keys) {
-      if (current === null || current === undefined || typeof current !== 'object') {
-        throw new Error(`Path ${path} not found: ${key} is not an object`);
-      }
-      if (!(key in current)) {
-        throw new Error(`Path ${path} not found: ${key} does not exist`);
-      }
-      current = current[key];
-    }
-    
-    return current;
+  public getValueAtPath(obj: unknown, path: string): unknown {
+    return readValueAtPath(obj, path);
   }
 
-  public setValueAtPath(obj: any, path: string, value: any): void {
-    const keys = path.split('.');
-    let current = obj;
-    
-    for (let i = 0; i < keys.length - 1; i++) {
-      const key = keys[i];
-      if (!(key in current) || typeof current[key] !== 'object' || current[key] === null) {
-        current[key] = {};
-      }
-      current = current[key];
-    }
-    
-    current[keys[keys.length - 1]] = value;
+  public setValueAtPath(obj: unknown, path: string, value: unknown): void {
+    writeValueAtPath(obj, path, value);
   }
 
-  public deleteValueAtPath(obj: any, path: string): void {
-    const keys = path.split('.');
-    let current = obj;
-    
-    for (let i = 0; i < keys.length - 1; i++) {
-      const key = keys[i];
-      if (current === null || current === undefined || typeof current !== 'object') {
-        throw new Error(`Path ${path} not found: ${key} is not an object`);
-      }
-      if (!(key in current)) {
-        throw new Error(`Path ${path} not found: ${key} does not exist`);
-      }
-      current = current[key];
-    }
-    
-    const lastKey = keys[keys.length - 1];
-    if (current === null || current === undefined || typeof current !== 'object') {
-      throw new Error(`Path ${path} not found: cannot delete from non-object`);
-    }
-    if (!(lastKey in current)) {
-      throw new Error(`Path ${path} not found: ${lastKey} does not exist`);
-    }
-    
-    delete current[lastKey];
+  public deleteValueAtPath(obj: unknown, path: string): void {
+    removeValueAtPath(obj, path);
   }
 
   public async readJsonFile(filePath: string): Promise<any> {

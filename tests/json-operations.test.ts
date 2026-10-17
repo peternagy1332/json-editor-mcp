@@ -243,4 +243,47 @@ describe('JSON Operations', () => {
       expect(server.getValueAtPath(obj, "price")).toBe(99.99);
     });
   });
+
+  describe('prototype pollution', () => {
+    const blocked = ['__proto__.pwned', 'constructor.prototype.pwned', 'nested.prototype.pwned'];
+
+    it('should reject dangerous path segments before writing', () => {
+      for (const blockedPath of blocked) {
+        const obj: Record<string, unknown> = {};
+        expect(() => server.setValueAtPath(obj, blockedPath, 'x')).toThrow(/Invalid path segment/);
+        expect(obj).toEqual({});
+        expect(Object.hasOwn(Object.prototype, 'pwned')).toBe(false);
+        expect(Object.getPrototypeOf(obj)).toBe(Object.prototype);
+      }
+    });
+
+    it('should not read or delete inherited properties', () => {
+      const obj = { key: 'value' };
+      expect(() => server.getValueAtPath(obj, 'toString')).toThrow('toString does not exist');
+      expect(() => server.deleteValueAtPath(obj, '__proto__.key')).toThrow('Invalid path segment: __proto__');
+      expect(obj).toEqual({ key: 'value' });
+    });
+
+    it('should keep a __proto__ key from JSON as own data during merge', () => {
+      const input: unknown = JSON.parse('{"__proto__":{"pwned":"no"},"name":"ok"}');
+      const result = server.deepMergeDuplicates(input);
+      expect(Object.hasOwn(result, '__proto__')).toBe(true);
+      expect(result.name).toBe('ok');
+      expect(Object.hasOwn(Object.prototype, 'pwned')).toBe(false);
+      expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+    });
+
+    it('should reject a dangerous path when writing a file', async () => {
+      const filePath = await createTestFile('proto.json', { name: 'ok' });
+      const results = await server.writeMultipleJsonValues(
+        [filePath],
+        'nested',
+        '{"__proto__":{"pwned":"x"}}',
+      );
+
+      expect(results[filePath]).toContain('Invalid path segment: __proto__');
+      expect(await readTestFile(filePath)).toEqual({ name: 'ok' });
+      expect(Object.hasOwn(Object.prototype, 'pwned')).toBe(false);
+    });
+  });
 });
